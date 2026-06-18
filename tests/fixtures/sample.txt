@@ -1,0 +1,4 @@
+Machine learning is the study of algorithms that improve through experience.
+Deep learning uses neural networks with many layers.
+Natural language processing enables computers to understand human language.
+Retrieval augmented generation combines search with large language models.
