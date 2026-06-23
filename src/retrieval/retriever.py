@@ -1,19 +1,18 @@
-"""Semantic vector retrieval over FAISS."""
-
+from typing import List, Tuple
 from src.embeddings.embedder import Embedder
-from src.models import RetrievalResult
 from src.vectorstore.faiss_store import FaissStore
-
+from src.models import Document
 
 class Retriever:
-    """Retrieve relevant document chunks using semantic similarity."""
+    """Retrieves relevant documents from the vector store."""
 
-    def __init__(self, embedder: Embedder, store: FaissStore, top_k: int = 5):
+    def __init__(self, vector_store: FaissStore, embedder: Embedder, top_k: int = 5):
+        self.vector_store = vector_store
         self.embedder = embedder
-        self.store = store
         self.top_k = top_k
 
-    def retrieve(self, query: str) -> list[RetrievalResult]:
-        """Embed the query and return the top-k matching chunks."""
+    def retrieve(self, query: str) -> List[Tuple[Document, float]]:
+        """Embeds the query and retrieves the top-k matching documents."""
         query_embedding = self.embedder.embed_query(query)
-        return self.store.search(query_embedding, top_k=self.top_k)
+        return self.vector_store.search(query_embedding, top_k=self.top_k)
+

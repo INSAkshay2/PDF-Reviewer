@@ -1,151 +1,309 @@
-# Enterprise Multi-Source Knowledge Assistant — Phase 1
+# 🚀 Enterprise Multi-Source RAG Knowledge Assistant (Phase 1)
 
-Phase 1 implements a production-style **PDF RAG pipeline** on CPU:
-
-**PDF → Chunking → BGE Embeddings → FAISS → Gemini → Grounded Answer with Citations**
-
-Built with custom modular Python (no LangChain) so each layer is explicit and learnable.
+A Retrieval-Augmented Generation (RAG) application that allows users to query PDF documents using natural language. The system retrieves relevant document chunks using semantic search and generates accurate answers using Google's Gemini API.
 
 ---
 
-## Architecture
+## 📌 Project Overview
 
-```
-app/streamlit_app.py          ← User interface
-src/pipeline/rag_pipeline.py  ← Orchestrates ingest + query
-src/ingestion/pdf_loader.py   ← PyMuPDF text extraction (per page)
-src/processing/chunker.py     ← Overlapping chunks with page metadata
-src/embeddings/embedder.py    ← BAAI/bge-small-en-v1.5 (local)
-src/vectorstore/faiss_store.py← FAISS IndexFlatIP + metadata JSON
-src/retrieval/retriever.py    ← Semantic top-k search
-src/llm/gemini_client.py      ← Gemini 2.5 Flash grounded generation
-```
+This project is the first phase of an Enterprise Knowledge Base Assistant.
 
-### Data flow
+The application:
 
-1. **Upload PDF** → saved to `data/uploads/`
-2. **Extract text** per page (preserves page numbers for citations)
-3. **Clean + chunk** (~800 chars, 150 overlap, per-page splitting)
-4. **Embed chunks** locally with BGE-small (384-dim, normalized)
-5. **Store in FAISS** → saved to `data/indices/{doc_id}.index` + `_meta.json`
-6. **Ask question** → embed query → FAISS top-5 → Gemini with strict grounding prompt
-7. **Answer** with inline citations like `[Source: report.pdf, Page 3]`
+- Loads PDF documents
+- Splits documents into semantic chunks
+- Converts chunks into embeddings
+- Stores embeddings in a FAISS vector database
+- Retrieves the most relevant chunks for a query
+- Uses Gemini 2.5 Flash to generate grounded answers
+- Provides source citations for transparency
 
 ---
 
-## Setup
+## 🏗️ Architecture
 
-### 1. Clone and install
+```text
+PDF Document
+      │
+      ▼
+PDF Loader
+      │
+      ▼
+Document Chunking
+      │
+      ▼
+BGE Embeddings
+      │
+      ▼
+FAISS Vector Store
+      │
+      ▼
+Retriever
+      │
+      ▼
+Gemini 2.5 Flash
+      │
+      ▼
+Answer + Citations
+```
+
+---
+
+## ✨ Features
+
+### ✅ PDF Ingestion
+
+Upload and process PDF documents.
+
+### ✅ Intelligent Chunking
+
+Documents are split into manageable chunks using RecursiveCharacterTextSplitter.
+
+### ✅ Semantic Search
+
+Uses vector similarity search instead of keyword matching.
+
+### ✅ Local Embeddings
+
+Generates embeddings using:
+
+```text
+BAAI/bge-small-en-v1.5
+```
+
+### ✅ FAISS Vector Database
+
+Stores document embeddings for efficient retrieval.
+
+### ✅ Gemini Integration
+
+Uses Gemini 2.5 Flash to generate context-aware answers.
+
+### ✅ Source Citations
+
+Displays document pages used to generate answers.
+
+---
+
+## 🛠️ Tech Stack
+
+| Component       | Technology                 |
+| --------------- | -------------------------- |
+| Language        | Python                     |
+| LLM             | Gemini 2.5 Flash           |
+| Embeddings      | BAAI/bge-small-en-v1.5     |
+| Vector Database | FAISS                      |
+| Framework       | LangChain                  |
+| PDF Processing  | PyPDF                      |
+| Environment     | Python Virtual Environment |
+
+---
+
+## 📂 Project Structure
+
+```text
+enterprise-rag/
+│
+├── data/
+│   └── sample.pdf
+│
+├── src/
+│   ├── pdf_loader.py
+│   ├── chunker.py
+│   ├── embedder.py
+│   ├── vector_store.py
+│   ├── retriever.py
+│   └── gemini_client.py
+│
+├── .env
+│
+├── main.py
+│
+└── README.md
+```
+
+---
+
+## ⚙️ Installation
+
+### Clone Repository
 
 ```bash
-cd "PDF Reviewer"
+git clone <repository-url>
+cd enterprise-rag
+```
+
+### Create Virtual Environment
+
+```bash
 python -m venv venv
+```
 
-# Windows
+### Activate Environment
+
+Windows:
+
+```bash
 venv\Scripts\activate
+```
 
+Linux / Mac:
+
+```bash
+source venv/bin/activate
+```
+
+### Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure API key
+---
+
+## 🔑 Gemini API Configuration
+
+Create a `.env` file in the project root:
+
+```env
+GEMINI_API_KEY=YOUR_API_KEY
+```
+
+Get your API key from Google AI Studio.
+
+---
+
+## ▶️ Running the Project
 
 ```bash
-copy .env.example .env
+python main.py
 ```
 
-Edit `.env` and set your Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey):
+Example:
 
-```
-GEMINI_API_KEY=your_key_here
-```
-
-### 3. Run the app
-
-```bash
-streamlit run app/streamlit_app.py
+```text
+Ask a question:
+What are the company's revenue figures?
 ```
 
-Open `http://localhost:8501` in your browser.
+Output:
 
----
+```text
+Answer:
+The company reported revenue growth of ...
 
-## Usage
-
-1. Upload a **text-based PDF** in the sidebar
-2. Click **Process Document** (first run downloads ~130MB embedding model)
-3. Ask questions in the chat interface
-4. Expand **Sources** on each answer to see retrieved chunks, pages, and scores
-
----
-
-## Project Structure
-
-| File | Purpose |
-|------|---------|
-| `src/config.py` | Environment settings (models, chunk size, paths) |
-| `src/models.py` | Pydantic schemas: Chunk, Citation, RAGResponse |
-| `src/ingestion/pdf_loader.py` | PyMuPDF page-level extraction |
-| `src/processing/cleaner.py` | Whitespace + hyphenation cleanup |
-| `src/processing/chunker.py` | Recursive split with overlap |
-| `src/embeddings/embedder.py` | sentence-transformers BGE wrapper |
-| `src/vectorstore/faiss_store.py` | FAISS index save/load/search |
-| `src/retrieval/retriever.py` | Query embedding + top-k retrieval |
-| `src/llm/gemini_client.py` | Grounded Gemini generation + citations |
-| `src/pipeline/rag_pipeline.py` | End-to-end ingest and query API |
-| `app/streamlit_app.py` | Streamlit UI |
-
----
-
-## Testing
-
-```bash
-pytest tests/ -v
+Sources:
+Page 5
+Page 8
+Page 10
 ```
 
-Tests cover chunking (overlap, page metadata), FAISS save/load/search, and retriever ranking with a mock embedder. Gemini is not called in unit tests.
+---
+
+## 🔍 How Retrieval Works
+
+### Step 1: PDF Loading
+
+The PDF is converted into LangChain Documents.
+
+### Step 2: Chunking
+
+Documents are split into chunks using:
+
+```python
+RecursiveCharacterTextSplitter(
+    chunk_size=500,
+    chunk_overlap=50
+)
+```
+
+### Step 3: Embeddings
+
+Each chunk is converted into a vector representation using:
+
+```text
+BAAI/bge-small-en-v1.5
+```
+
+### Step 4: Vector Storage
+
+Embeddings are stored in a FAISS index.
+
+### Step 5: Retrieval
+
+For every user query:
+
+```text
+User Question
+      ↓
+Embedding
+      ↓
+Similarity Search
+      ↓
+Top-K Relevant Chunks
+```
+
+### Step 6: Gemini Generation
+
+Retrieved chunks are provided as context to Gemini, which generates the final answer.
 
 ---
 
-## Debugging Tips
+## 📊 Current Limitations
 
-| Problem | Likely cause | Fix |
-|---------|--------------|-----|
-| No text extracted | Scanned/image PDF | Use a text-native PDF |
-| Irrelevant answers | Chunk size mismatch | Tune `CHUNK_SIZE` / `CHUNK_OVERLAP` in `.env` |
-| Model ignores context | Weak prompt | Already strict; lower `LLM_TEMPERATURE` |
-| Slow first run | Model download | Normal; BGE caches in `~/.cache/huggingface/` |
-| API errors | Missing/invalid key | Check `.env` GEMINI_API_KEY |
-| FAISS dimension error | Model changed | Re-process the PDF to rebuild index |
+- Supports PDF documents only
+- Single-user environment
+- No Streamlit UI yet
+- No chat history
+- No re-ranking
+- No multi-source ingestion
 
 ---
 
-## Streamlit Cloud Deployment
+## 🚧 Upcoming Features (Phase 2)
 
-1. Push repo to GitHub
-2. Connect at [share.streamlit.io](https://share.streamlit.io)
-3. Set main file: `app/streamlit_app.py`
-4. Add secret: `GEMINI_API_KEY`
-5. Free tier has ~1GB RAM — BGE-small fits; expect 30–60s cold start
-
----
-
-## Phase 1 Scope
-
-**Included:** PDF ingestion, chunking, local BGE embeddings, FAISS persistence, semantic retrieval, Gemini grounded Q&A, Streamlit UI, citations, chat history.
-
-**Phase 2 (next):** CSV + website ingestion, BGE reranker (top-20 → top-5), sentence-window retrieval.
+- Website ingestion
+- CSV ingestion
+- Streamlit chat interface
+- Persistent vector database
+- Multi-document support
+- Chat history
+- Metadata management
 
 ---
 
-## Dependencies
+## 📈 Future Enhancements
 
-| Package | Role |
-|---------|------|
-| `streamlit` | Web UI |
-| `pymupdf` | PDF text extraction |
-| `sentence-transformers` | Local BGE embeddings |
-| `faiss-cpu` | Vector similarity search |
-| `google-genai` | Gemini API |
-| `pydantic` | Typed data models |
-| `python-dotenv` | Environment variables |
-| `pytest` | Unit tests |
+- Sentence Window Retrieval
+- Hybrid Search
+- Re-ranking using BGE Reranker
+- Graph RAG
+- AWS Deployment
+- Enterprise Authentication
+- Knowledge Base Management Dashboard
+
+---
+
+## 🎯 Learning Outcomes
+
+Through this project, I gained hands-on experience with:
+
+- Retrieval-Augmented Generation (RAG)
+- Embedding Models
+- Vector Databases
+- Semantic Search
+- LangChain
+- FAISS
+- Gemini API Integration
+- Prompt Engineering
+- LLM Application Development
+
+---
+
+## 👨‍💻 Author
+
+Akshay
+
+Mathematics & Computing Student
+
+Building AI, ML, and Data-Driven Applications.

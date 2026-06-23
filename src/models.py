@@ -40,6 +40,9 @@ class RAGResponse(BaseModel):
     retrieval_results: list[RetrievalResult] = Field(default_factory=list)
     grounded: bool = True
 
+class Document(BaseModel):
+    text: str
+    metadata: dict = Field(default_factory=dict)
 
 class IngestResult(BaseModel):
     doc_id: str

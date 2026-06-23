@@ -13,6 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 UPLOADS_DIR = DATA_DIR / "uploads"
 INDICES_DIR = DATA_DIR / "indices"
+FAISS_INDEX_PATH = INDICES_DIR / "faiss.index" 
 
 
 @dataclass(frozen=True)

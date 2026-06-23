@@ -1,108 +1,62 @@
-"""FAISS vector store with metadata persistence."""
-
-import json
-import logging
-from pathlib import Path
-
 import faiss
 import numpy as np
-
-from src.models import Chunk, RetrievalResult
-
-logger = logging.getLogger(__name__)
-
+import os
+import pickle
+from typing import List, Tuple
+from src.models import Document
 
 class FaissStore:
-    """Store embeddings in FAISS and keep chunk metadata in sync."""
+    """Manages the FAISS index and document metadata."""
 
-    def __init__(self, dimension: int):
+    def __init__(self, index_path: str, dimension: int = 768):
+        self.index_path = index_path
         self.dimension = dimension
-        self.index = faiss.IndexFlatIP(dimension)
-        self.chunks: list[Chunk] = []
+        self.index = None
+        self.documents = []
+        self._load_or_create_index()
 
-    @property
-    def size(self) -> int:
-        return len(self.chunks)
+    def _load_or_create_index(self):
+        """Loads the FAISS index and metadata from disk, or creates them if they don't exist."""
+        if os.path.exists(f"{self.index_path}.index") and os.path.exists(f"{self.index_path}.pkl"):
+            print(f"Loading existing index from {self.index_path}")
+            self.index = faiss.read_index(f"{self.index_path}.index")
+            with open(f"{self.index_path}.pkl", "rb") as f:
+                self.documents = pickle.load(f)
+        else:
+            print("Creating new FAISS index.")
+            self.index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
+            self.documents = []
 
-    def add_chunks(self, chunks: list[Chunk], embeddings: np.ndarray) -> None:
-        """Add chunks and their embeddings to the index."""
+    def add_documents(self, chunks: List[Document], embeddings: np.ndarray):
+        """Adds documents and their embeddings to the index."""
         if not chunks:
             return
 
-        if embeddings.shape[0] != len(chunks):
-            raise ValueError(
-                f"Embedding count ({embeddings.shape[0]}) does not match chunk count ({len(chunks)})"
-            )
-        if embeddings.shape[1] != self.dimension:
-            raise ValueError(
-                f"Embedding dimension ({embeddings.shape[1]}) does not match index ({self.dimension})"
-            )
+        start_index = self.index.ntotal
+        ids = np.arange(start_index, start_index + len(chunks))
 
-        vectors = np.ascontiguousarray(embeddings, dtype=np.float32)
-        self.index.add(vectors)
-        self.chunks.extend(chunks)
+        self.index.add_with_ids(embeddings.astype('float32'), ids)
+        self.documents.extend(chunks)
 
-    def search(self, query_embedding: np.ndarray, top_k: int = 5) -> list[RetrievalResult]:
-        """Return the top-k most similar chunks for a query embedding."""
-        if self.size == 0:
+        self.save_index()
+
+    def search(self, query_embedding: np.ndarray, top_k: int = 5) -> List[Tuple[Document, float]]:
+        """Searches the index for the most similar documents."""
+        if not self.documents:
             return []
 
-        k = min(top_k, self.size)
-        query_vector = np.ascontiguousarray(
-            query_embedding.reshape(1, -1), dtype=np.float32
-        )
-        scores, indices = self.index.search(query_vector, k)
+        distances, indices = self.index.search(query_embedding.astype('float32'), top_k)
 
-        results: list[RetrievalResult] = []
-        for score, idx in zip(scores[0], indices[0]):
-            if idx < 0:
-                continue
-            results.append(
-                RetrievalResult(chunk=self.chunks[idx], score=float(score))
-            )
+        results = []
+        for i, idx in enumerate(indices[0]):
+            if idx != -1:
+                results.append((self.documents[idx], distances[0][i]))
         return results
 
-    def save(self, path_prefix: str | Path) -> None:
-        """Persist the FAISS index and chunk metadata to disk."""
-        prefix = Path(path_prefix)
-        prefix.parent.mkdir(parents=True, exist_ok=True)
+    def save_index(self):
+        """Saves the FAISS index and metadata to disk."""
+        print(f"Saving index to {self.index_path}")
+        faiss.write_index(self.index, f"{self.index_path}.index")
+        with open(f"{self.index_path}.pkl", "wb") as f:
+            pickle.dump(self.documents, f)
 
-        index_path = prefix.with_suffix(".index")
-        meta_path = prefix.parent / f"{prefix.name}_meta.json"
-
-        faiss.write_index(self.index, str(index_path))
-        meta_payload = {
-            "dimension": self.dimension,
-            "chunks": [chunk.model_dump() for chunk in self.chunks],
-        }
-        meta_path.write_text(json.dumps(meta_payload, indent=2), encoding="utf-8")
-        logger.info("Saved FAISS index (%d chunks) to %s", self.size, index_path)
-
-    @classmethod
-    def load(cls, path_prefix: str | Path) -> "FaissStore":
-        """Load a previously saved FAISS index and metadata."""
-        prefix = Path(path_prefix)
-        index_path = prefix.with_suffix(".index")
-        meta_path = prefix.parent / f"{prefix.name}_meta.json"
-
-        if not index_path.exists():
-            raise FileNotFoundError(f"FAISS index not found: {index_path}")
-        if not meta_path.exists():
-            raise FileNotFoundError(f"Metadata file not found: {meta_path}")
-
-        meta_payload = json.loads(meta_path.read_text(encoding="utf-8"))
-        dimension = meta_payload["dimension"]
-        chunks = [Chunk(**item) for item in meta_payload["chunks"]]
-
-        store = cls(dimension=dimension)
-        store.index = faiss.read_index(str(index_path))
-        store.chunks = chunks
-
-        if store.index.ntotal != len(store.chunks):
-            raise ValueError(
-                f"Index vector count ({store.index.ntotal}) "
-                f"does not match metadata chunk count ({len(store.chunks)})"
-            )
-
-        logger.info("Loaded FAISS index (%d chunks) from %s", store.size, index_path)
-        return store
