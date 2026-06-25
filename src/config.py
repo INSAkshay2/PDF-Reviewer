@@ -8,10 +8,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
-UPLOADS_DIR = DATA_DIR / "uploads"
-INDICES_DIR = DATA_DIR / "indices"
-FAISS_INDEX_PATH = str(INDICES_DIR / "knowledge_base")
+
+DATA_DIR = Path(os.getenv("DATA_DIR", PROJECT_ROOT / "data"))
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", DATA_DIR / "uploads"))
+INDICES_DIR = Path(os.getenv("INDICES_DIR", DATA_DIR / "indices"))
+FAISS_INDEX_PATH = str(Path(os.getenv("FAISS_INDEX_PATH", INDICES_DIR / "knowledge_base")))
+
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 INDICES_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -29,6 +31,7 @@ class Settings:
     url_timeout: int
     uploads_dir: Path
     indices_dir: Path
+    faiss_index_path: str
 
 
 @lru_cache
@@ -45,4 +48,5 @@ def get_settings() -> Settings:
         url_timeout=int(os.getenv("URL_TIMEOUT", "30")),
         uploads_dir=UPLOADS_DIR,
         indices_dir=INDICES_DIR,
+        faiss_index_path=FAISS_INDEX_PATH,
     )

@@ -2,9 +2,10 @@ import logging
 import os
 import sys
 from pathlib import Path
+from functools import lru_cache
 
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -18,17 +19,23 @@ from src.pipeline.rag_pipeline import RAGPipeline
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="PDF Reviewer API")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+app = FastAPI(title="ContextFlow API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[FRONTEND_URL, "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-pipeline = RAGPipeline()
+
+@lru_cache(maxsize=1)
+def get_pipeline() -> RAGPipeline:
+    logger.info("Initializing RAG pipeline...")
+    return RAGPipeline()
 
 
 class QueryRequest(BaseModel):
@@ -47,23 +54,29 @@ def health():
 
 @app.get("/api/stats")
 def stats():
+    pipeline = get_pipeline()
     return pipeline.get_stats()
 
 
 @app.get("/api/sources")
 def sources():
+    pipeline = get_pipeline()
     return pipeline.get_source_summary()
 
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOADS_DIR, file.filename)
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+    file_path = UPLOADS_DIR / file.filename
     content = await file.read()
+
     with open(file_path, "wb") as f:
         f.write(content)
 
     try:
-        result = pipeline.ingest_file(file_path)
+        pipeline = get_pipeline()
+        result = pipeline.ingest_file(str(file_path))
         return result.model_dump()
     except Exception as e:
         logger.exception("Ingest failed")
@@ -73,6 +86,7 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/api/ingest-url")
 def ingest_url(req: UrlIngestRequest):
     try:
+        pipeline = get_pipeline()
         result = pipeline.ingest_url(req.url)
         return result.model_dump()
     except Exception as e:
@@ -83,6 +97,7 @@ def ingest_url(req: UrlIngestRequest):
 @app.post("/api/query")
 def query(req: QueryRequest):
     try:
+        pipeline = get_pipeline()
         result = pipeline.query(req.question, req.chat_history)
         return result
     except Exception as e:
@@ -92,6 +107,7 @@ def query(req: QueryRequest):
 
 @app.post("/api/clear")
 def clear():
+    pipeline = get_pipeline()
     pipeline.clear()
     return {"status": "cleared"}
 
