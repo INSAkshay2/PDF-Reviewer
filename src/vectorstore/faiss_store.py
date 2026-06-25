@@ -1,62 +1,100 @@
+import logging
+import pickle
+from pathlib import Path
+from typing import List, Tuple
+
 import faiss
 import numpy as np
-import os
-import pickle
-from typing import List, Tuple
+
 from src.models import Document
 
+logger = logging.getLogger(__name__)
+
+
 class FaissStore:
-    """Manages the FAISS index and document metadata."""
-
-    def __init__(self, index_path: str, dimension: int = 768):
-        self.index_path = index_path
+    def __init__(self, index_path: str | Path, dimension: int):
+        self.index_path = Path(index_path)
         self.dimension = dimension
-        self.index = None
-        self.documents = []
-        self._load_or_create_index()
+        self.index_path.parent.mkdir(parents=True, exist_ok=True)
+        self.index = faiss.IndexIDMap(faiss.IndexFlatIP(dimension))
+        self.documents: List[Document] = []
+        self._load()
 
-    def _load_or_create_index(self):
-        """Loads the FAISS index and metadata from disk, or creates them if they don't exist."""
-        if os.path.exists(f"{self.index_path}.index") and os.path.exists(f"{self.index_path}.pkl"):
-            print(f"Loading existing index from {self.index_path}")
-            self.index = faiss.read_index(f"{self.index_path}.index")
-            with open(f"{self.index_path}.pkl", "rb") as f:
-                self.documents = pickle.load(f)
-        else:
-            print("Creating new FAISS index.")
-            self.index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
-            self.documents = []
+    @property
+    def size(self) -> int:
+        return len(self.documents)
 
-    def add_documents(self, chunks: List[Document], embeddings: np.ndarray):
-        """Adds documents and their embeddings to the index."""
-        if not chunks:
+    def add_documents(self, documents: List[Document], embeddings: np.ndarray) -> None:
+        if not documents:
             return
+        if embeddings.shape[0] != len(documents):
+            raise ValueError(
+                f"Embedding count ({embeddings.shape[0]}) "
+                f"does not match document count ({len(documents)})"
+            )
+        if embeddings.shape[1] != self.dimension:
+            raise ValueError(
+                f"Embedding dimension ({embeddings.shape[1]}) "
+                f"does not match index dimension ({self.dimension})"
+            )
 
-        start_index = self.index.ntotal
-        ids = np.arange(start_index, start_index + len(chunks))
+        start_id = self.index.ntotal
+        ids = np.arange(start_id, start_id + len(documents), dtype=np.int64)
+        vectors = np.ascontiguousarray(embeddings, dtype=np.float32)
 
-        self.index.add_with_ids(embeddings.astype('float32'), ids)
-        self.documents.extend(chunks)
-
-        self.save_index()
+        self.index.add_with_ids(vectors, ids)
+        self.documents.extend(documents)
+        self._save()
 
     def search(self, query_embedding: np.ndarray, top_k: int = 5) -> List[Tuple[Document, float]]:
-        """Searches the index for the most similar documents."""
-        if not self.documents:
+        if self.size == 0:
             return []
 
-        distances, indices = self.index.search(query_embedding.astype('float32'), top_k)
+        k = min(top_k, self.size)
+        query_vector = np.ascontiguousarray(
+            query_embedding.reshape(1, -1), dtype=np.float32
+        )
+        scores, indices = self.index.search(query_vector, k)
 
-        results = []
-        for i, idx in enumerate(indices[0]):
-            if idx != -1:
-                results.append((self.documents[idx], distances[0][i]))
+        results: List[Tuple[Document, float]] = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx >= 0 and idx < len(self.documents):
+                doc = self.documents[idx].model_copy()
+                doc.score = float(score)
+                results.append((doc, float(score)))
         return results
 
-    def save_index(self):
-        """Saves the FAISS index and metadata to disk."""
-        print(f"Saving index to {self.index_path}")
-        faiss.write_index(self.index, f"{self.index_path}.index")
-        with open(f"{self.index_path}.pkl", "wb") as f:
-            pickle.dump(self.documents, f)
+    def get_all_embeddings(self) -> np.ndarray:
+        if self.size == 0:
+            return np.array([]).reshape(0, self.dimension)
+        return self.index.reconstruct_n(0, self.size)
 
+    def clear(self) -> None:
+        self.index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
+        self.documents = []
+        self._save()
+
+    def _save(self) -> None:
+        index_file = self.index_path.with_suffix(".index")
+        meta_file = self.index_path.with_suffix(".pkl")
+        faiss.write_index(self.index, str(index_file))
+        with open(meta_file, "wb") as f:
+            pickle.dump(self.documents, f)
+        logger.info("Saved FAISS index (%d docs) to %s", self.size, index_file)
+
+    def _load(self) -> None:
+        index_file = self.index_path.with_suffix(".index")
+        meta_file = self.index_path.with_suffix(".pkl")
+        if index_file.exists() and meta_file.exists():
+            try:
+                self.index = faiss.read_index(str(index_file))
+                with open(meta_file, "rb") as f:
+                    self.documents = pickle.load(f)
+                logger.info(
+                    "Loaded FAISS index (%d docs) from %s",
+                    self.size, index_file,
+                )
+            except Exception as e:
+                logger.warning("Failed to load existing index, starting fresh: %s", e)
+                self.index = faiss.IndexIDMap(faiss.IndexFlatIP(self.dimension))
+                self.documents = []

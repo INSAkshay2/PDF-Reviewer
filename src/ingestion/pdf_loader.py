@@ -1,23 +1,20 @@
-"""Extract text and metadata from PDF files using PyMuPDF."""
-
 import logging
 from pathlib import Path
 
 import fitz
 
-from src.models import DocumentPage
+from src.models import Document
 
 logger = logging.getLogger(__name__)
 
 
-def load_pdf(path: str | Path) -> list[DocumentPage]:
-    """Load a PDF and return one DocumentPage per non-empty page."""
-    pdf_path = Path(path)
+def load_pdf(file_path: str | Path) -> list[Document]:
+    pdf_path = Path(file_path)
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
     source_file = pdf_path.name
-    pages: list[DocumentPage] = []
+    documents: list[Document] = []
 
     with fitz.open(pdf_path) as doc:
         for page_index in range(len(doc)):
@@ -27,23 +24,22 @@ def load_pdf(path: str | Path) -> list[DocumentPage]:
             if not text:
                 logger.warning(
                     "Page %d in '%s' has no extractable text (may be scanned/image-only).",
-                    page_index + 1,
-                    source_file,
+                    page_index + 1, source_file,
                 )
                 continue
 
-            pages.append(
-                DocumentPage(
-                    page_number=page_index + 1,
-                    text=text,
-                    source_file=source_file,
-                )
-            )
+            documents.append(Document(
+                text=text,
+                source=source_file,
+                source_type="pdf",
+                page=page_index + 1,
+                metadata={"file_path": str(pdf_path)},
+            ))
 
-    if not pages:
+    if not documents:
         raise ValueError(
             f"No text could be extracted from '{source_file}'. "
-            "The PDF may be image-based; OCR is not supported in Phase 1."
+            "The PDF may be image-based; OCR is not supported."
         )
 
-    return pages
+    return documents

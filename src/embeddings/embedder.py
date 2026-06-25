@@ -1,9 +1,12 @@
 """Local embedding generation using sentence-transformers."""
 
 import logging
+import os
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+os.environ.setdefault("TQDM_DISABLE", "1")
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,7 @@ class Embedder:
         self.batch_size = batch_size
         logger.info("Loading embedding model: %s", model_name)
         self.model = SentenceTransformer(model_name)
-        self.dimension = self.model.get_sentence_embedding_dimension()
+        self.dimension = self.model.get_embedding_dimension()
 
     def embed_documents(self, texts: list[str]) -> np.ndarray:
         """Embed document chunks for indexing."""

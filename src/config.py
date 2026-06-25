@@ -1,5 +1,3 @@
-"""Application configuration loaded from environment variables."""
-
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -13,7 +11,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 UPLOADS_DIR = DATA_DIR / "uploads"
 INDICES_DIR = DATA_DIR / "indices"
-FAISS_INDEX_PATH = INDICES_DIR / "faiss.index" 
+FAISS_INDEX_PATH = str(INDICES_DIR / "knowledge_base")
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+INDICES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass(frozen=True)
@@ -26,17 +26,13 @@ class Settings:
     top_k: int
     embedding_batch_size: int
     llm_temperature: float
+    url_timeout: int
     uploads_dir: Path
     indices_dir: Path
 
 
 @lru_cache
 def get_settings() -> Settings:
-    uploads_dir = UPLOADS_DIR
-    indices_dir = INDICES_DIR
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    indices_dir.mkdir(parents=True, exist_ok=True)
-
     return Settings(
         gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
         embedding_model=os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"),
@@ -46,6 +42,7 @@ def get_settings() -> Settings:
         top_k=int(os.getenv("TOP_K", "5")),
         embedding_batch_size=int(os.getenv("EMBEDDING_BATCH_SIZE", "32")),
         llm_temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
-        uploads_dir=uploads_dir,
-        indices_dir=indices_dir,
+        url_timeout=int(os.getenv("URL_TIMEOUT", "30")),
+        uploads_dir=UPLOADS_DIR,
+        indices_dir=INDICES_DIR,
     )
