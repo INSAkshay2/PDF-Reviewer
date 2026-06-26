@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { getApiBaseUrl } from "@/lib/api";
 import { Send, Loader2, Bot, User, BookOpen } from "lucide-react";
 
 interface Citation {
@@ -20,14 +21,19 @@ interface Message {
   citations?: Citation[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBaseUrl();
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState<{ total_chunks: number; unique_sources: number } | null>(null);
-  const [sources, setSources] = useState<{ source: string; type: string; chunks: number }[]>([]);
+  const [stats, setStats] = useState<{
+    total_chunks: number;
+    unique_sources: number;
+  } | null>(null);
+  const [sources, setSources] = useState<
+    { source: string; type: string; chunks: number }[]
+  >([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -117,8 +123,8 @@ export function ChatInterface() {
                 Ask anything about your documents
               </h3>
               <p className="text-muted-foreground/60 max-w-md">
-                Upload PDFs, CSVs, or add website URLs, then ask questions.
-                The AI will answer using only your uploaded content.
+                Upload PDFs, CSVs, or add website URLs, then ask questions. The
+                AI will answer using only your uploaded content.
               </p>
             </div>
           ) : (
@@ -140,7 +146,9 @@ export function ChatInterface() {
                         : "bg-secondary border border-border rounded-bl-sm"
                     }`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {msg.content}
+                    </p>
                     {msg.citations && msg.citations.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border/50">
                         <p className="text-xs text-muted-foreground mb-2 font-mono">
@@ -156,7 +164,10 @@ export function ChatInterface() {
                                 <span className="font-medium text-foreground/80">
                                   {cit.source}
                                 </span>
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0"
+                                >
                                   p.{cit.page}
                                 </Badge>
                                 {cit.score !== undefined && (
@@ -188,9 +199,18 @@ export function ChatInterface() {
                   </div>
                   <div className="bg-secondary border border-border rounded-2xl rounded-bl-sm px-5 py-3">
                     <div className="flex gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <div className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce" style={{ animationDelay: "300ms" }} />
+                      <div
+                        className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <div
+                        className="w-2 h-2 rounded-full bg-muted-foreground/40 animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -204,7 +224,11 @@ export function ChatInterface() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={loading ? "Waiting for response..." : "Ask a question about your documents..."}
+            placeholder={
+              loading
+                ? "Waiting for response..."
+                : "Ask a question about your documents..."
+            }
             disabled={loading}
             className="bg-secondary border-border rounded-xl"
           />
@@ -214,7 +238,11 @@ export function ChatInterface() {
             size="icon"
             className="rounded-xl shrink-0"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </div>
       </div>
@@ -228,12 +256,20 @@ export function ChatInterface() {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-background rounded-lg p-3 text-center">
-                  <p className="text-2xl font-display text-primary">{stats.total_chunks}</p>
-                  <p className="text-[10px] text-muted-foreground font-mono">Chunks</p>
+                  <p className="text-2xl font-display text-primary">
+                    {stats.total_chunks}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    Chunks
+                  </p>
                 </div>
                 <div className="bg-background rounded-lg p-3 text-center">
-                  <p className="text-2xl font-display text-primary">{stats.unique_sources}</p>
-                  <p className="text-[10px] text-muted-foreground font-mono">Sources</p>
+                  <p className="text-2xl font-display text-primary">
+                    {stats.unique_sources}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    Sources
+                  </p>
                 </div>
               </div>
             </div>
@@ -250,8 +286,12 @@ export function ChatInterface() {
                     <span className="text-muted-foreground">
                       {s.type === "pdf" ? "📄" : s.type === "csv" ? "📊" : "🌐"}
                     </span>
-                    <span className="text-foreground/80 truncate flex-1">{s.source}</span>
-                    <span className="text-muted-foreground font-mono">{s.chunks}c</span>
+                    <span className="text-foreground/80 truncate flex-1">
+                      {s.source}
+                    </span>
+                    <span className="text-muted-foreground font-mono">
+                      {s.chunks}c
+                    </span>
                   </div>
                 ))}
               </div>

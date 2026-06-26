@@ -18,12 +18,25 @@ logger = logging.getLogger(__name__)
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "*")
 
+
+def _normalize_origins(raw_value: str) -> list[str]:
+    origins: list[str] = []
+    for origin in raw_value.split(","):
+        cleaned = origin.strip().rstrip("/")
+        if cleaned:
+            origins.append(cleaned)
+    return origins
+
+
+allowed_origins = ["*"] if FRONTEND_URL == "*" else _normalize_origins(FRONTEND_URL)
+allow_credentials = allowed_origins != ["*"]
+
 app = FastAPI(title="ContextFlow API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL] if FRONTEND_URL != "*" else ["*"],
-    allow_credentials=FRONTEND_URL != "*",
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -148,7 +161,9 @@ def clear():
 
 
 def main():
-    uvicorn.run("backend.server:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", "8000"))
+    reload_enabled = os.getenv("RELOAD", "false").lower() == "true"
+    uvicorn.run("backend.server:app", host="0.0.0.0", port=port, reload=reload_enabled)
 
 
 if __name__ == "__main__":

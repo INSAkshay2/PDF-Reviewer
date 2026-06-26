@@ -5,9 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, Globe, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { getApiBaseUrl } from "@/lib/api";
+import {
+  Upload,
+  FileText,
+  Globe,
+  Loader2,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = getApiBaseUrl();
 
 export function UploadArea() {
   const { toast } = useToast();
@@ -47,7 +55,7 @@ export function UploadArea() {
         setUploading(false);
       }
     },
-    [toast]
+    [toast],
   );
 
   const handleUrlIngest = async () => {
