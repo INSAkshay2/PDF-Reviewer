@@ -114,8 +114,9 @@ class GeminiClient:
                 if attempt < self.max_retries - 1:
                     time.sleep(wait)
 
+        logger.error("Gemini API call failed permanently: %s", last_error)
         raise RuntimeError(
-            f"Gemini API failed after {self.max_retries} attempts: {last_error}"
+            "The AI service is temporarily unavailable. Please try again later."
         )
 
     def _extract_citations(

@@ -64,9 +64,32 @@ def sources():
     return pipeline.get_source_summary()
 
 
+ALLOWED_EXTENSIONS = {".pdf", ".csv"}
+ALLOWED_MIMETYPES = {
+    "application/pdf",
+    "text/csv",
+    "application/csv",
+    "text/plain",
+}
+
+
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     from src.config import get_settings
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Only PDF and CSV files are accepted.",
+        )
+
+    if file.content_type and file.content_type not in ALLOWED_MIMETYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid content type '{file.content_type}'. Only PDF and CSV files are accepted.",
+        )
+
     settings = get_settings()
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)
 
@@ -79,10 +102,17 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         pipeline = get_pipeline()
         result = pipeline.ingest_file(str(file_path))
+        if not result.success and result.error:
+            raise HTTPException(status_code=400, detail=result.error)
         return result.model_dump()
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Ingest failed")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to process the file. Ensure it is a valid text-based PDF or CSV.",
+        )
 
 
 @app.post("/api/ingest-url")
@@ -104,7 +134,10 @@ def query(req: QueryRequest):
         return result
     except Exception as e:
         logger.exception("Query failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate an answer. Please try again.",
+        )
 
 
 @app.post("/api/clear")
