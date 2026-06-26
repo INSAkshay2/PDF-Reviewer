@@ -2,8 +2,7 @@ import logging
 import os
 from pathlib import Path
 
-from src.config import UPLOADS_DIR
-from src.embeddings.embedder import Embedder
+from src.embeddings.base import EmbeddingService
 from src.ingestion.csv_loader import load_csv
 from src.ingestion.document_processor import process_documents
 from src.ingestion.pdf_loader import load_pdf
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 class IngestionPipeline:
     def __init__(
         self,
-        embedder: Embedder,
+        embedder: EmbeddingService,
         chunker: Chunker,
         vector_store: FaissStore,
     ):
@@ -116,8 +115,11 @@ class IngestionPipeline:
 
     @staticmethod
     def save_uploaded_file(uploaded_file) -> str:
-        file_path = os.path.join(UPLOADS_DIR, uploaded_file.name)
-        UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+        from src.config import get_settings
+        settings = get_settings()
+        uploads_dir = settings.uploads_dir
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        file_path = os.path.join(uploads_dir, uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         return file_path

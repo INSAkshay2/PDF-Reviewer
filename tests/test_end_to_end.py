@@ -1,4 +1,4 @@
-"""Quick functional test of the pipeline (no API key needed for ingest)."""
+"""Quick functional test of the pipeline (local embeddings for CI)."""
 import os
 import tempfile
 
@@ -54,7 +54,8 @@ def test_pipeline_imports():
     from src.ingestion.web_loader import load_website
     from src.processing.chunker import Chunker
     from src.processing.cleaner import clean_text
-    from src.embeddings.embedder import Embedder
+    from src.embeddings.base import EmbeddingService
+    from src.embeddings import create_embedder
     from src.vectorstore.faiss_store import FaissStore
     from src.retrieval.retriever import Retriever
     from src.llm.gemini_client import GeminiClient
@@ -66,7 +67,8 @@ def test_pipeline_imports():
     assert load_csv is not None
     assert Chunker is not None
     assert clean_text is not None
-    assert Embedder is not None
+    assert EmbeddingService is not None
+    assert create_embedder is not None
     assert FaissStore is not None
     assert Retriever is not None
     assert GeminiClient is not None

@@ -1,14 +1,26 @@
+# Core server
 fastapi>=0.115.0
 uvicorn>=0.32.0
 python-multipart>=0.0.12
-pymupdf>=1.24.0
-sentence-transformers>=3.0.0
-faiss-cpu>=1.8.0
-google-genai>=1.0.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
+
+# Vector store & retrieval
+faiss-cpu>=1.8.0
 numpy>=1.26.0
-pytest>=8.0.0
+
+# LLM & embeddings (Gemini)
+google-genai>=1.0.0
+
+# Ingestion
+pymupdf>=1.24.0
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
+
+# Dev / testing
+pytest>=8.0.0
+
+# Optional: local embeddings (sentence-transformers + PyTorch)
+# Install only for local dev: pip install sentence-transformers>=3.0.0
+# Set EMBEDDING_PROVIDER=local to use

@@ -13,9 +13,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import UPLOADS_DIR
-from src.pipeline.rag_pipeline import RAGPipeline
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -31,10 +28,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+logger.info("FastAPI app booted — RAG stack not yet loaded")
+
 
 @lru_cache(maxsize=1)
-def get_pipeline() -> RAGPipeline:
-    logger.info("Initializing RAG pipeline...")
+def get_pipeline():
+    logger.info("Initializing RAG pipeline lazily...")
+    from src.pipeline.rag_pipeline import RAGPipeline
     return RAGPipeline()
 
 
@@ -49,7 +49,7 @@ class UrlIngestRequest(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "rag_loaded": False}
 
 
 @app.get("/api/stats")
@@ -66,9 +66,11 @@ def sources():
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    from src.config import get_settings
+    settings = get_settings()
+    settings.uploads_dir.mkdir(parents=True, exist_ok=True)
 
-    file_path = UPLOADS_DIR / file.filename
+    file_path = settings.uploads_dir / file.filename
     content = await file.read()
 
     with open(file_path, "wb") as f:
